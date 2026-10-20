@@ -1,29 +1,20 @@
 # -*- coding: utf-8 -*-
-import json, os
+import json
+from concurrent.futures import ThreadPoolExecutor
 import gs_harvest as G
-import gs_client as C
 
 BOOK = "31001747475"
-Hc, host = G.conta()
-print("conta auth:", str((Hc or {}).get("authorization", ""))[:18], "host:", host)
-
 caps, err = G.capitulos(BOOK)
 caps = caps or []
-print("caps:", len(caps), "err:", err)
-pagos = [c for c in caps if (c.get("price") or 0) > 0][:3]
-print("pagos:", [c["id"] for c in pagos])
+pagos = [c for c in caps if (c.get("price") or 0) > 0][:16]
+print("pagos:", len(pagos))
 
-for c in pagos:
-    urls = G.urls_do_capitulo(BOOK, c)
-    print("  urls_do_capitulo cap", c["id"], "->", len(urls))
-
-print("--- chamada crua com a MESMA conta ---")
-Hc, host = G.conta()
-st, r = C.chamar("hwycclientreels/chapter/load",
-                 {"bookId": BOOK, "chapterIds": [pagos[0]["id"]], "viewAd": True},
-                 extra=Hc, host=host)
-d = json.loads(r)
-it = ((d.get("data") or {}).get("list") or [{}])[0]
-print("status:", d.get("status"), "msg:", str(d.get("message"))[:40],
-      "cdn:", len(it.get("cdnList") or []))
-print("raw:", r[:200])
+ok = 0
+for nw in (1, 2, 4, 8):
+    lote = pagos[ok:ok + nw] or pagos[:nw]
+    with ThreadPoolExecutor(max_workers=nw) as ex:
+        res = list(ex.map(lambda c: G.processar(BOOK, c), lote))
+    bons = sum(1 for r, e in res if r)
+    erros = [e for r, e in res if not r]
+    print("workers=%d lote=%d -> ok=%d erros=%s" % (nw, len(lote), bons, erros[:3]))
+    ok += bons
