@@ -44,9 +44,28 @@ HOSTES = [x for x in os.environ.get(
     "https://api2.good-short.com,https://api.goodreels.com,https://api.good-short.com"
 ).split(",") if x.strip()]
 COTA = int(os.environ.get("GS_COTA", "8"))
-ESPERA3015 = float(os.environ.get("GS_ESPERA_3015", "120"))
+ESPERA3015 = float(os.environ.get("GS_ESPERA_3015", "600"))
 _rc = {"contas": 0, "host": 0, "lock": threading.Lock()}
 _rcl = threading.local()
+# freio global: quando o IP entra em 3015, todos os workers pausam juntos
+_pausa = {"ate": 0.0, "vezes": 0}
+
+
+def pausado():
+    """Dorme enquanto o freio global estiver ativo."""
+    while True:
+        with _rc["lock"]:
+            falta = _pausa["ate"] - time.time()
+        if falta <= 0:
+            return
+        time.sleep(min(falta, 30))
+
+
+def freiou():
+    with _rc["lock"]:
+        if _pausa["ate"] <= time.time():
+            _pausa["vezes"] += 1
+        _pausa["ate"] = time.time() + ESPERA3015
 
 
 def _afid_novo():
@@ -257,7 +276,8 @@ def capitulos(book):
 def urls_do_capitulo(book, cap):
     # viewAd:true -> o servidor entrega a URL assinada de capitulo pago
     # (funciona ate em conta convidada, sem VIP e sem anuncio)
-    for tent in range(6):
+    for tent in range(10):
+        pausado()
         Hc, host = conta()
         if Hc is None:
             return []
@@ -273,10 +293,9 @@ def urls_do_capitulo(book, cap):
         except Exception:
             return []
         if d.get("status") == 3015:
-            # throttle por IP: nao adianta trocar de conta, tem que esperar
-            espera = ESPERA3015 * (tent + 1)
-            print("3015 no IP: esperando %.0fs (cap %s)" % (espera, cap["id"]), flush=True)
-            time.sleep(espera)
+            # throttle por IP: nao adianta trocar de conta; trava o job inteiro
+            freiou()
+            print("3015: pausa global de %.0fs (cap %s)" % (ESPERA3015, cap["id"]), flush=True)
             continue
         if d.get("status") != 0:
             troca_conta()
