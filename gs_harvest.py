@@ -44,6 +44,7 @@ HOSTES = [x for x in os.environ.get(
     "https://api2.good-short.com,https://api.goodreels.com,https://api.good-short.com"
 ).split(",") if x.strip()]
 COTA = int(os.environ.get("GS_COTA", "8"))
+ESPERA3015 = float(os.environ.get("GS_ESPERA_3015", "120"))
 _rc = {"contas": 0, "host": 0, "lock": threading.Lock()}
 _rcl = threading.local()
 
@@ -256,7 +257,7 @@ def capitulos(book):
 def urls_do_capitulo(book, cap):
     # viewAd:true -> o servidor entrega a URL assinada de capitulo pago
     # (funciona ate em conta convidada, sem VIP e sem anuncio)
-    for tent in range(4):
+    for tent in range(6):
         Hc, host = conta()
         if Hc is None:
             return []
@@ -271,6 +272,12 @@ def urls_do_capitulo(book, cap):
             d = json.loads(r)
         except Exception:
             return []
+        if d.get("status") == 3015:
+            # throttle por IP: nao adianta trocar de conta, tem que esperar
+            espera = ESPERA3015 * (tent + 1)
+            print("3015 no IP: esperando %.0fs (cap %s)" % (espera, cap["id"]), flush=True)
+            time.sleep(espera)
+            continue
         if d.get("status") != 0:
             troca_conta()
             continue
