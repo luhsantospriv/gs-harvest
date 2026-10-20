@@ -145,6 +145,32 @@ def b2_pool(n):
         _pool.put(b2_nova_url())
 
 
+def b2_listar(prefixo):
+    """Lista todos os nomes de arquivo sob um prefixo do bucket."""
+    with _lock:
+        if _b2["api"] is None:
+            b2_auth()
+        api, tok, bid = _b2["api"], _b2["tok"], _b2["bid"]
+    nomes = []
+    inicio = None
+    while True:
+        corpo = {"bucketId": bid, "prefix": prefixo, "maxFileCount": 1000}
+        if inicio:
+            corpo["startFileName"] = inicio
+        req = urllib.request.Request(
+            api + "/b2api/v2/b2_list_file_names",
+            data=json.dumps(corpo).encode(),
+            headers={"Authorization": tok, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            d = json.loads(r.read())
+        for f in d.get("files", []):
+            nomes.append(f["fileName"])
+        inicio = d.get("nextFileName")
+        if not inicio:
+            break
+    return nomes
+
+
 def b2_upload(caminho, key):
     dados = open(caminho, "rb").read()
     sha1 = hashlib.sha1(dados).hexdigest()
@@ -328,7 +354,22 @@ def main():
                 done.add(json.loads(ln)["book"] + ":" + str(json.loads(ln)["chapterId"]))
             except Exception:
                 pass
-    print("já feitos:", len(done), flush=True)
+    print("já feitos (progresso local):", len(done), flush=True)
+
+    # pula o que ja esta no B2 (permite rodar varios runners com sobreposicao)
+    if not os.environ.get("GS_IGNORA_B2"):
+        try:
+            chaves = b2_listar("_videos/goodshort/")
+            for k in chaves:
+                p = k.split("/")
+                if len(p) >= 4:
+                    cid = p[3].rsplit("_", 1)[-1]
+                    if cid.endswith(".mp4"):
+                        cid = cid[:-4]
+                    done.add(p[2] + ":" + cid)
+            print("no B2:", len(chaves), "-> pular:", len(done), flush=True)
+        except Exception as e:
+            print("aviso: nao listei o B2:", repr(e)[:80], flush=True)
 
     ids = ([args.book] if args.book else json.load(open(args.ids, encoding="utf-8")))
     # aceita lista de ids ou lista de objetos (gs_prioridade.json)
