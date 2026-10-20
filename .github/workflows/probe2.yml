@@ -4,14 +4,22 @@ on:
 jobs:
   p:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install --quiet cryptography
+      - name: deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          pip install --quiet cryptography
+          ffmpeg -version | head -1
       - name: testar
         env:
           SIGN_KEY: ${{ secrets.SIGN_KEY }}
+          B2_KID: ${{ secrets.B2_KID }}
+          B2_AK: ${{ secrets.B2_AK }}
+          GS_HOSTS: "https://api2.good-short.com,https://api.goodreels.com,https://api.good-short.com"
         run: python -u probe2.py
