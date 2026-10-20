@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       shard:
-        description: "indice do shard (0..of-1)"
+        description: "indice do shard"
         default: "0"
       of:
         description: "total de shards"
-        default: "1"
+        default: "40"
       workers:
         description: "workers paralelos"
-        default: "16"
+        default: "8"
       limit:
         description: "limite de livros (0 = todos)"
         default: "0"
@@ -37,12 +37,13 @@ jobs:
       - name: harvest
         env:
           SIGN_KEY: ${{ secrets.SIGN_KEY }}
-          VIP_HEADERS: ${{ secrets.VIP_HEADERS }}
           B2_KID: ${{ secrets.B2_KID }}
           B2_AK: ${{ secrets.B2_AK }}
+          GS_HOSTS: "https://api2.good-short.com,https://api.goodreels.com,https://api.good-short.com"
+          GS_WORKERS: "${{ inputs.workers }}"
         run: |
           python -u gs_harvest.py \
-            --ids gs_pt_ids.json \
+            --ids gs_prioridade.json \
             --workers ${{ inputs.workers }} \
             --shard ${{ inputs.shard }} \
             --of ${{ inputs.of }} \
