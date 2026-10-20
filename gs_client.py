@@ -26,7 +26,15 @@ APK = os.path.join(B, "gs.apk")
 PREFS = os.path.join(B, "gsnow.xml")
 HDRS = os.path.join(B, "gs_vip_headers.json")
 
-BASE = "https://api-akm.goodreels.com"
+BASE = os.environ.get("GS_API", "https://api-akm.goodreels.com")
+RPS = float(os.environ.get("GS_RPS", "6"))
+
+
+class WafBlock(Exception):
+    """Akamai recusou a requisicao (WAF)."""
+     # requisicoes por segundo (global)
+_RATE_LOCK = None
+_ULTIMO = [0.0]
 PKG = "com.newreading.goodreels"
 CM_FIXO = "919326DD9A742D064502468E1BF11144"
 
@@ -80,7 +88,7 @@ _CM = None
 _K = None
 
 
-def chamar(rota, corpo=None, extra=None, debug=False):
+def chamar(rota, corpo=None, extra=None, debug=False, host=None):
     global _T, _CM, _K
     if _T is None:
         _T = template_headers()
@@ -106,7 +114,19 @@ def chamar(rota, corpo=None, extra=None, debug=False):
     if extra:
         h.update(extra)
 
-    url = BASE + "/" + rota.lstrip("/") + "?timestamp=" + ts
+    # ------- limitador global de taxa (evita o WAF) -------
+    global _RATE_LOCK
+    if _RATE_LOCK is None:
+        import threading
+        _RATE_LOCK = threading.Lock()
+    with _RATE_LOCK:
+        intervalo = 1.0 / max(RPS, 0.1)
+        espera = _ULTIMO[0] + intervalo - time.time()
+        if espera > 0:
+            time.sleep(espera)
+        _ULTIMO[0] = time.time()
+
+    url = (host or BASE) + "/" + rota.lstrip("/") + "?timestamp=" + ts
     dados = corpo_txt.encode() if corpo_txt else None
     st, raw, enc = 0, b"", ""
     for tent in range(4):
@@ -128,6 +148,8 @@ def chamar(rota, corpo=None, extra=None, debug=False):
         except Exception:
             pass
     txt = raw.decode("utf-8", "replace")
+    if "Access Denied" in txt:
+        raise WafBlock("Access Denied")
     if debug:
         print("%s -> %s (%d bytes)" % (rota, st, len(raw)))
         print(txt[:400])
