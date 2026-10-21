@@ -45,6 +45,8 @@ HOSTES = [x for x in os.environ.get(
 ).split(",") if x.strip()]
 COTA = int(os.environ.get("GS_COTA", "8"))
 ESPERA3015 = float(os.environ.get("GS_ESPERA_3015", "600"))
+# VIP=1 -> usa a conta com assinatura ativa (nao consome anuncio, sem cota)
+VIP = os.environ.get("GS_VIP") == "1"
 _rc = {"contas": 0, "host": 0, "lock": threading.Lock()}
 _rcl = threading.local()
 # freio global: quando o IP entra em 3015, todos os workers pausam juntos
@@ -102,6 +104,13 @@ def nova_conta():
 
 def conta():
     """Headers+host da conta do thread, renovando a cada COTA desbloqueios."""
+    if VIP:
+        # conta com assinatura ativa: nao consome anuncio, nao ha cota.
+        # so alterna o host para nao concentrar tudo em um so.
+        with _rc["lock"]:
+            host = HOSTES[_rc["host"] % len(HOSTES)]
+            _rc["host"] += 1
+        return BASE, host
     if getattr(_rcl, "H", None) is None or getattr(_rcl, "usados", 0) >= COTA:
         H, host = nova_conta()
         if H is None:
@@ -281,9 +290,11 @@ def urls_do_capitulo(book, cap):
         Hc, host = conta()
         if Hc is None:
             return []
+        corpo = {"bookId": book, "chapterIds": [cap["id"]]}
+        if not VIP:
+            corpo["viewAd"] = True
         try:
-            st, r = C.chamar("hwycclientreels/chapter/load",
-                             {"bookId": book, "chapterIds": [cap["id"]], "viewAd": True},
+            st, r = C.chamar("hwycclientreels/chapter/load", corpo,
                              extra=Hc, host=host)
         except Exception:
             time.sleep(1.5 * (tent + 1))
