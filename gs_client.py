@@ -41,26 +41,31 @@ CM_FIXO = "919326DD9A742D064502468E1BF11144"
 
 # ---------- cabecalhos modelo, vindos de uma requisicao real ----------
 def template_headers():
-    env = os.environ.get("VIP_HEADERS")
-    if env:
-        return json.loads(env)
-    if not os.path.exists(LOG):
-        return json.load(open(HDRS, encoding="utf-8"))
-    linhas = open(LOG, encoding="utf-8", errors="replace").read().splitlines()
+    # base: a requisicao real capturada (42 cabecalhos, exigidos na assinatura)
     h = {}
-    dentro = False
-    for ln in linhas:
-        if re.match(r"^\d\d:\d\d:\d\d REQ POST https://api-akm", ln):
-            dentro = True
-            continue
-        if dentro:
-            m = re.match(r"^   H ([^:]+): (.*)$", ln)
-            if m:
-                h[m.group(1).strip()] = m.group(2)
+    if os.path.exists(LOG):
+        linhas = open(LOG, encoding="utf-8", errors="replace").read().splitlines()
+        dentro = False
+        for ln in linhas:
+            if re.match(r"^\d\d:\d\d:\d\d REQ POST https://api-akm", ln):
+                dentro = True
                 continue
-            if ln.startswith("============") or re.match(r"^\d\d:\d\d:\d\d ", ln):
-                break
-    return h or json.load(open(HDRS, encoding="utf-8"))
+            if dentro:
+                m = re.match(r"^   H ([^:]+): (.*)$", ln)
+                if m:
+                    h[m.group(1).strip()] = m.group(2)
+                    continue
+                if ln.startswith("============") or re.match(r"^\d\d:\d\d:\d\d ", ln):
+                    break
+    if not h:
+        h = dict(json.load(open(HDRS, encoding="utf-8")))
+    # por cima: token/fingerprint do arquivo (ou do segredo VIP_HEADERS)
+    env = os.environ.get("VIP_HEADERS")
+    extra = json.loads(env) if env else json.load(open(HDRS, encoding="utf-8"))
+    h.update(extra)
+    for volatil in ("sign", "timestamp", "content-length", "Content-Length"):
+        h.pop(volatil, None)
+    return h
 
 
 def cert_md5():
