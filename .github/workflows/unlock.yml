@@ -1,0 +1,36 @@
+name: gs-unlock
+
+on:
+  workflow_dispatch:
+    inputs:
+      shard:
+        description: "indice do shard"
+        default: "0"
+      of:
+        description: "total de shards"
+        default: "60"
+
+jobs:
+  unlock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet cryptography
+      - name: unlock
+        env:
+          SIGN_KEY: ${{ secrets.SIGN_KEY }}
+          B2_KID: ${{ secrets.B2_KID }}
+          B2_AK: ${{ secrets.B2_AK }}
+        run: |
+          python -u gs_unlock_runner.py --shard ${{ inputs.shard }} --of ${{ inputs.of }}
+      - name: resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unlock-${{ inputs.shard }}
+          path: unlock_result.jsonl
+          if-no-files-found: ignore
