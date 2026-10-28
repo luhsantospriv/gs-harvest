@@ -26,9 +26,31 @@ FILA = os.path.join(B, "gs_fila.json")
 C._T = None
 
 _lock = threading.Lock()
-cont = {"novos": 0, "contas": 0}
+cont = {"novos": 0, "contas": 0, "publicado": 0}
+SHARD = [0]
 
 H0 = json.load(open(os.path.join(B, "gs_vip_headers.json"), encoding="utf-8"))
+
+try:
+    import gs_harvest as GH
+    _tem_b2 = True
+except Exception:
+    GH = None
+    _tem_b2 = False
+
+
+def publica_b2():
+    """sobe o resultado parcial para o B2 (visivel em tempo real)."""
+    if not _tem_b2:
+        return
+    try:
+        if GH._b2["tok"] is None:
+            GH.b2_auth()
+        GH.b2_upload(SAIDA, "_unlock/fluxo-%d.jsonl" % SHARD[0])
+        cont["publicado"] += 1
+        log("publicado no B2 (lote %d)" % cont["publicado"])
+    except Exception as e:
+        log("b2 erro: %s" % repr(e)[:60])
 
 
 def log(t):
@@ -157,6 +179,8 @@ def worker(idw, fila, idx, cache):
                                          "via": "adfluxo"}, ensure_ascii=False) + "\n")
                 cont["novos"] += 1
         log("w%d: conta feita, %d unlocks (total %d)" % (idw, usados, cont["novos"]))
+        if cont["novos"] > 0 and cont["novos"] % 40 == 0:
+            publica_b2()
 
 
 def main():
@@ -168,6 +192,7 @@ def main():
     args = ap.parse_args()
 
     fila = json.load(open(FILA, encoding="utf-8"))
+    SHARD[0] = args.shard
     # shard por indice
     meu = [f for i, f in enumerate(fila) if i % args.of == args.shard]
     log("shard %d/%d: %d capitulos | %d workers" % (args.shard, args.of,
