@@ -1,0 +1,32 @@
+name: gs-fluxo
+
+on:
+  workflow_dispatch:
+    inputs:
+      shard:
+        default: "0"
+      of:
+        default: "3"
+      workers:
+        default: "2"
+
+jobs:
+  unlock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet cryptography
+      - name: unlock
+        run: |
+          python -u gs_unlock_runner2.py --shard ${{ inputs.shard }} --of ${{ inputs.of }} --workers ${{ inputs.workers }}
+      - name: resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluxo-${{ inputs.shard }}
+          path: unlock_result.jsonl
+          if-no-files-found: ignore
