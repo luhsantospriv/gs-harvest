@@ -46,11 +46,14 @@ def publica_b2():
     try:
         if GH._b2["tok"] is None:
             GH.b2_auth()
+        if GH._pool.empty():
+            GH.b2_pool(2)
         GH.b2_upload(SAIDA, "_unlock/fluxo-%d.jsonl" % SHARD[0])
         cont["publicado"] += 1
-        log("publicado no B2 (lote %d)" % cont["publicado"])
+        log("publicado no B2 (lote %d, %d unlocks)"
+            % (cont["publicado"], cont["novos"]))
     except Exception as e:
-        log("b2 erro: %s" % repr(e)[:60])
+        log("b2 erro: %s" % repr(e)[:80])
 
 
 def log(t):
