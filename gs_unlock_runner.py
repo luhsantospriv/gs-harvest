@@ -52,7 +52,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--of", type=int, default=1)
-    ap.add_argument("--max-contas", type=int, default=10)
+    ap.add_argument("--max-contas", type=int, default=20)
     args = ap.parse_args()
 
     fila = json.load(open(FILA, encoding="utf-8"))
@@ -91,19 +91,19 @@ def main():
             elif d.get("status") == 3015:
                 falhas_3015 += 1
                 if falhas_3015 >= 3:
-                    # cota acabou: pausa longa, nova conta
-                    time.sleep(10)
+                    # 3015 em ciclo: espera a janela abrir (5-10 min)
+                    espera = 300 + random.randint(0, 120)
+                    print("  3015 x3: esperando %ds pela janela" % espera, flush=True)
+                    time.sleep(espera)
                     H = conta()
-                    if H:
-                        time.sleep(5)  # deixa a conta assentar
                     contas += 1
                     usados = 0
                     falhas_3015 = 0
                     if not H or contas > args.max_contas:
-                        print("  contas esgotadas (%d)" % contas, flush=True)
+                        print("  fim (%d contas)" % contas, flush=True)
                         break
                 else:
-                    time.sleep(5)
+                    time.sleep(60)
             else:
                 time.sleep(1)
         except Exception as e:
