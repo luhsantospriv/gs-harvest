@@ -52,7 +52,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--of", type=int, default=1)
-    ap.add_argument("--max-contas", type=int, default=30)
+    ap.add_argument("--max-contas", type=int, default=10)
     args = ap.parse_args()
 
     fila = json.load(open(FILA, encoding="utf-8"))
@@ -91,9 +91,11 @@ def main():
             elif d.get("status") == 3015:
                 falhas_3015 += 1
                 if falhas_3015 >= 3:
-                    # IP esgotado ou cota acabou: nova conta
-                    time.sleep(5)
+                    # cota acabou: pausa longa, nova conta
+                    time.sleep(10)
                     H = conta()
+                    if H:
+                        time.sleep(5)  # deixa a conta assentar
                     contas += 1
                     usados = 0
                     falhas_3015 = 0
@@ -101,9 +103,9 @@ def main():
                         print("  contas esgotadas (%d)" % contas, flush=True)
                         break
                 else:
-                    time.sleep(2)
+                    time.sleep(5)
             else:
-                time.sleep(0.5)
+                time.sleep(1)
         except Exception as e:
             if "Waf" in type(e).__name__:
                 print("  WAF! 60s", flush=True)
@@ -112,7 +114,7 @@ def main():
                 time.sleep(2)
         if (i + 1) % 50 == 0:
             print("  %d/%d | ok=%d contas=%d" % (i + 1, len(meu), ok, contas), flush=True)
-        time.sleep(0.3)
+        time.sleep(1.5)
 
     out.close()
     print("FIM shard %d: %d unlocks | %d contas" % (args.shard, ok, contas), flush=True)
