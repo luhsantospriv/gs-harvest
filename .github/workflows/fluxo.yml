@@ -6,7 +6,7 @@ on:
       shard:
         default: "0"
       of:
-        default: "6"
+        default: "12"
       workers:
         default: "3"
 
