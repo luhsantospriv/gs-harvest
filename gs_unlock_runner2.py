@@ -26,7 +26,7 @@ FILA = os.path.join(B, "gs_fila.json")
 C._T = None
 
 _lock = threading.Lock()
-cont = {"novos": 0, "contas": 0, "publicado": 0}
+cont = {"novos": 0, "contas": 0, "publicado": 0, "pub_em": 0}
 SHARD = [0]
 
 H0 = json.load(open(os.path.join(B, "gs_vip_headers.json"), encoding="utf-8"))
@@ -179,7 +179,8 @@ def worker(idw, fila, idx, cache):
                                          "via": "adfluxo"}, ensure_ascii=False) + "\n")
                 cont["novos"] += 1
         log("w%d: conta feita, %d unlocks (total %d)" % (idw, usados, cont["novos"]))
-        if cont["novos"] > 0 and cont["novos"] % 40 == 0:
+        if cont["novos"] - cont["pub_em"] >= 24:
+            cont["pub_em"] = cont["novos"]
             publica_b2()
 
 
