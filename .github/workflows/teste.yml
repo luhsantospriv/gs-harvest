@@ -13,4 +13,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install --quiet cryptography
-      - run: python -u gs_runner_teste.py
+      - run: python -u gs_runner_teste2.py
