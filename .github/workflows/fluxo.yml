@@ -6,9 +6,9 @@ on:
       shard:
         default: "0"
       of:
-        default: "3"
+        default: "6"
       workers:
-        default: "2"
+        default: "3"
 
 jobs:
   unlock:
@@ -21,6 +21,9 @@ jobs:
           python-version: "3.12"
       - run: pip install --quiet cryptography
       - name: unlock
+        env:
+          B2_KID: ${{ secrets.B2_KID }}
+          B2_AK: ${{ secrets.B2_AK }}
         run: |
           python -u gs_unlock_runner2.py --shard ${{ inputs.shard }} --of ${{ inputs.of }} --workers ${{ inputs.workers }}
       - name: resultado
